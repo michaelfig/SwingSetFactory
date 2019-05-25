@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/Agoric/SwingSetFactory#readme",
   "dependencies": {
-    "@agoric/swingset-vat": "0.0.8"
+    "@agoric/swingset-vat": "0.0.8",
+    "ws": "^7.0.0"
   }
 }
