@@ -1,0 +1,35 @@
+#! /usr/bin/env node
+const self = process.argv[1];
+if (process.env.SWINGSET_WORKER) {
+  const home = process.env.SWINGSET_WORKER;
+  console.log('TODO: Would run', home);
+  process.exit(0);
+}
+
+console.log('Starting SwingSetFactory');
+const child_process = require('child_process');
+
+async function runWorker(home) {
+  return new Promise((resolve, reject) => {
+    const worker = child_process.fork(self, [], {
+      env: {...process.env, SWINGSET_WORKER: home},
+      silent: true,
+      });
+    worker.stdout.on('data', (data) => {
+      console.log('from child:', data.toString().trimRight());
+    });
+    worker.stderr.on('data', (data) => {
+      console.log('child error:', data.toString().trimRight());
+    });
+    worker.on('close', (code) => {
+      console.log('child exited with code', code);
+      resolve(code);
+    });
+  });
+}
+
+// TODO: Start a network service
+runWorker(`${__dirname}/../demo/encouragementBot`)
+  .then((code) => {
+    console.log('got worker exit of', code);
+  });

@@ -1,0 +1,28 @@
+{
+  "name": "@agoric/swingset-factory",
+  "version": "0.1.0",
+  "description": "Web application for running Agoric SwingSets",
+  "main": "src/main.js",
+  "bin": {
+    "ssfactory": "bin/ssfactory"
+  },
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Agoric/SwingSetFactory.git"
+  },
+  "author": "Agoric",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Agoric/SwingSetFactory/issues"
+  },
+  "homepage": "https://github.com/Agoric/SwingSetFactory#readme",
+  "dependencies": {
+    "@agoric/swingset-vat": "0.0.8"
+  }
+}

@@ -1,0 +1,5 @@
+#! /bin/sh
+PORT=${PORT-8000}
+exec docker run -p127.0.0.1:$PORT:$PORT \
+  --rm -it \
+  agoric/swingset-factory ${1+"$@"}
