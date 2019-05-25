@@ -24,6 +24,7 @@
   "homepage": "https://github.com/Agoric/SwingSetFactory#readme",
   "dependencies": {
     "@agoric/swingset-vat": "0.0.8",
+    "express": "^4.17.0",
     "ws": "^7.0.0"
   }
 }

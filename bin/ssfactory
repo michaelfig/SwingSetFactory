@@ -45,7 +45,10 @@ function unframe(framed, maxLength) {
   return [str.substr(0, length - 1), str.substr(length)];
 }
 
-async function runWorker(home, send) {
+let lastWorkerID = 0;
+async function runWorker(instance, home, send) {
+  const workerID = ++lastWorkerID;
+  const log = (...args) => console.log(`Worker.${workerID}[${instance}]:`, ...args)
   return new Promise((resolve, reject) => {
     let buf = '';
     const worker = child_process.fork(self, [], {
@@ -63,7 +66,7 @@ async function runWorker(home, send) {
     }})
     worker.stdout.on('data', (data) => {
       const str = String(data);
-      console.log('from child:', str);
+      log('from child:', str);
       buf += str;
       let strBuf;
       while ((strBuf = unframe(buf)) && strBuf[0] !== undefined) {
@@ -73,11 +76,11 @@ async function runWorker(home, send) {
     });
     worker.stderr.on('data', (data) => {
       // Note, we have no framing, since anything could write to stderr.
-      console.log('child error:', data.toString().trimRight());
+      log('child error:', data.toString().trimRight());
       send({type: 'WORKER_ERROR', error: data.toString()});
     });
     worker.on('close', (code) => {
-      console.log('child exited with code', code);
+      log('child exited with code', code);
       send({type: 'WORKER_EXIT', code});
       resolve(code);
     });
@@ -86,11 +89,20 @@ async function runWorker(home, send) {
 
 // Start a network service
 const fs = require('fs');
-const http = require('http');
+const express = require('express');
 const WebSocket = require('ws');
 
-const server = http.createServer();
+const app = express();
+const server = app.listen(PORT, function listening() {
+  console.log('Listening on', PORT);
+});
 const wss = new WebSocket.Server({server});
+
+app.use(express.static(`${__dirname}/../ui/build`));
+
+function newVatMachineID() {
+  return `FIXME:${Math.random()}`;
+}
 
 function demoPath(name) {
   // Make sure they don't try to escape the demo.
@@ -101,76 +113,92 @@ function demoPath(name) {
   return `${__dirname}/../demo/${s}`;
 }
 
-wss.on('connection', function connection(ws) {
-  let lastInstance = 0;
+let lastClientID = 0;
+wss.on('connection', function connection(ws, req) {
   const cancels = {};
+  const fwd = req.headers['x-forwarded-for'];
+  const ip = fwd ? fwd.split(/\s*,\s*/)[0] : req.connection.remoteAddress;
+  const clientID = `${++lastClientID}`;
+  const log = (...args) => console.log(`Client.${clientID}[${ip}]:`, ...args);
   const send = (obj) => ws.send(JSON.stringify(obj));
+  log('Connected');
   ws.on('close', function(code, reason) {
-    console.log('client closed');
-    for (const cancel of Object.values(cancels)) {
-      cancel();
+    log('client closed');
+    for (const [instance, cancel] of Object.entries(cancels)) {
+      try {
+        cancel();
+      } catch (e) {
+        log(`Cannot cancel ${instance}`, e);
+      }
     }
   });
   ws.on('error', function(err) {
-    console.log('client error', err);
+    log('client error', err);
   });
   ws.on('message', function incoming(message) {
-    const msg = String(message);
-    console.log('from client', msg);
-    const action = JSON.parse(msg);
-    switch (action.type) {
-    case 'SS_DEMO': {
-      const instance = ++lastInstance;
-      // Buffer messages until the worker starts.
-      const startBuf = [];
-      let toWorker = (obj) => {
-        startBuf.push(obj);
-      };
-      function fromWorker(obj) {
-        console.log('from worker', obj);
-        switch (obj.type) {
-          case 'WORKER_START':
-            toWorker = obj.send;
-            while (startBuf.length > 0) {
-              // Send the buffered messages.
-              toWorker(startBuf.shift());
+    try {
+      const msg = String(message);
+      log('from client', msg);
+      const action = JSON.parse(msg);
+      switch (action.type) {
+      case 'SS_DEMO': {
+        const instance = newVatMachineID();
+        const log = (...args) => console.log(`Client.${clientID}[${ip}][${instance}]:`, ...args);
+        // Buffer messages until the worker starts.
+        const startBuf = [];
+        let toWorker = (obj) => {
+          startBuf.push(obj);
+        };
+        function fromWorker(obj) {
+          try {
+            log('from worker', obj);
+            switch (obj.type) {
+              case 'WORKER_START':
+                toWorker = obj.send;
+                while (startBuf.length > 0) {
+                  // Send the buffered messages.
+                  toWorker(startBuf.shift());
+                }
+                cancels[instance] = () => {
+                  toWorker({type: 'WORKER_KILL'});
+                };
+                return;
             }
-            cancels[instance] = () => {
-              toWorker({type: 'WORKER_KILL'});
-            };
-            return;
+            send({type: 'SS_ERROR', instance, error: `Unrecognized worker message type ${JSON.stringify(action.type)}`});
+          } catch (e) {
+            log(`Internal ${instance} error`, e);
+            send({type: 'SS_ERROR', instance, error: `Internal error processing worker message`});
+          }
         }
-        send({type: 'SS_ERROR', instance, error: `Unrecognized worker message ${action.type}`});
-      }
 
-      runWorker(demoPath(action.name), fromWorker)
-        .then((code) => {
-          delete cancels[instance];
-          console.log('got worker exit of', code);
-          send({type: 'SS_EXIT', instance, code});
-        })
-        .catch(e => {
-          console.log('got exception', e);
-          send({type: 'SS_ERROR', instance, error})
-        });
-      break;
-    }
-    case 'SS_EXIT': {
-      toWorker({type: 'WORKER_EXIT'})
-    }
-    case 'SS_CANCEL': {
-      const cancel = cancels[instance];
-      if (!cancel) {
-        send({type: 'SS_ERROR', instance, error: `No cancel function for ${instance}`});
-        return;
+        runWorker(instance, demoPath(action.name), fromWorker)
+          .then((code) => {
+            delete cancels[instance];
+            log('got worker exit of', code);
+            send({type: 'SS_EXIT', instance, code});
+          })
+          .catch(e => {
+            log('got exception', e);
+            send({type: 'SS_ERROR', instance, error})
+          });
+        break;
       }
-      cancel();
+      case 'SS_EXIT': {
+        toWorker({type: 'WORKER_EXIT'})
+      }
+      case 'SS_CANCEL': {
+        const cancel = cancels[instance];
+        if (!cancel) {
+          send({type: 'SS_ERROR', instance, error: `No cancel function for ${instance}`});
+          return;
+        }
+        cancel();
+      }
+      }
+      send({type: 'SS_ERROR', error: `Unrecognized client message ${action.type}`});
+    } catch (e) {
+      log(`Error processing message ${JSON.stringify(message)}`, e);
+      send({type: 'SS_ERROR', error: `Internal server error`});
     }
-    }
-    send({type: 'SS_ERROR', error: `Unrecognized client message ${action.type}`});
   });
-});
-
-server.listen(PORT, function listening() {
-  console.log('Listening on', PORT);
 });
