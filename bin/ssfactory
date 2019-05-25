@@ -1,14 +1,17 @@
 #! /usr/bin/env node
 const self = process.argv[1];
 if (process.env.SWINGSET_WORKER) {
+  const log = (...args) => console.error(`SwingSet[${process.pid}]:`, ...args);
+  console.log = log;
   const home = process.env.SWINGSET_WORKER;
-  const send = (obj) => process.stdout.write(JSON.stringify(obj));
-  send()
-  console.log('TODO: Would run', home);
+  const send = (obj) => process.stdout.write(frame(JSON.stringify(obj)));
+  send({type: 'SWINGSET_STARTED'});
+  log('TODO: Would run', home);
   process.exit(0);
 }
 
-console.log('Starting SwingSetFactory');
+const log = (...args) => console.log(`Factory[${process.pid}]:`, ...args);
+log('Starting SwingSetFactory');
 const PORT = Number(process.env.PORT) || 8000;
 const child_process = require('child_process');
 
@@ -25,11 +28,11 @@ function unframe(framed, maxLength) {
     // Not yet enough data.
     return [undefined, framed];
   }
-  if (match[1].test(/^(0|[1-9]\d+)$/)) {
+  if (!match[1].match(/^(0|[1-9]\d+)$/)) {
     throw TypeError(`Invalid Netstring length code ${match[1]}`);
   }
 
-  const length = Nat(match[1]);
+  const length = Nat(Number(match[1]));
   if (maxLength !== undefined && length > maxLength) {
     throw RangeError(`Netstring length exceeds ${maxLength}`);
   }
@@ -42,7 +45,7 @@ function unframe(framed, maxLength) {
   if (str[length] != ',') {
     throw TypeError(`Netstring terminator missing from ${str}`);
   }
-  return [str.substr(0, length - 1), str.substr(length)];
+  return [str.substr(0, length), str.substr(length)];
 }
 
 let lastWorkerID = 0;
@@ -55,7 +58,7 @@ async function runWorker(instance, home, send) {
       env: {...process.env, SWINGSET_WORKER: home},
       silent: true,
       });
-    send({type: 'WORKER_START', send: (obj) => {
+    send({type: 'SWINGSET_STARTED', send: (obj) => {
       if (obj.type === 'WORKER_KILL') {
         // Kill off the worker unconditionally.
         worker.kill('KILL');
@@ -66,22 +69,24 @@ async function runWorker(instance, home, send) {
     }})
     worker.stdout.on('data', (data) => {
       const str = String(data);
-      log('from child:', str);
+      log('from child:', JSON.stringify(str));
       buf += str;
       let strBuf;
       while ((strBuf = unframe(buf)) && strBuf[0] !== undefined) {
         buf = strBuf[1];
-        send({type: 'WORKER_MESSAGE', message: strBuf[0]});
+        send(JSON.parse(strBuf[0]));
+      }
+      if (strBuf) {
+        buf = strBuf[1];
       }
     });
     worker.stderr.on('data', (data) => {
       // Note, we have no framing, since anything could write to stderr.
       log('child error:', data.toString().trimRight());
-      send({type: 'WORKER_ERROR', error: data.toString()});
+      send({type: 'SWINGSET_LOG', data: data.toString()});
     });
     worker.on('close', (code) => {
       log('child exited with code', code);
-      send({type: 'WORKER_EXIT', code});
       resolve(code);
     });
   });
@@ -94,11 +99,17 @@ const WebSocket = require('ws');
 
 const app = express();
 const server = app.listen(PORT, function listening() {
-  console.log('Listening on', PORT);
+  log('Listening on', PORT);
 });
 const wss = new WebSocket.Server({server});
 
 app.use(express.static(`${__dirname}/../ui/build`));
+
+const api = express.Router();
+api.get('foo', (req, res) => {
+  log('got foo');
+  res.sendStatus(200);
+});
 
 function newVatMachineID() {
   return `FIXME:${Math.random()}`;
@@ -138,23 +149,24 @@ wss.on('connection', function connection(ws, req) {
   ws.on('message', function incoming(message) {
     try {
       const msg = String(message);
-      log('from client', msg);
+      log('from client', JSON.stringify(msg));
       const action = JSON.parse(msg);
       switch (action.type) {
       case 'SS_DEMO': {
         const instance = newVatMachineID();
+        const demoName = action.name;
         const log = (...args) => console.log(`Client.${clientID}[${ip}][${instance}]:`, ...args);
         // Buffer messages until the worker starts.
         const startBuf = [];
         let toWorker = (obj) => {
           startBuf.push(obj);
         };
-        function fromWorker(obj) {
+        function fromWorker(action) {
           try {
-            log('from worker', obj);
-            switch (obj.type) {
-              case 'WORKER_START':
-                toWorker = obj.send;
+            log('from worker', action);
+            switch (action.type) {
+              case 'SWINGSET_STARTED': {
+                toWorker = action.send;
                 while (startBuf.length > 0) {
                   // Send the buffered messages.
                   toWorker(startBuf.shift());
@@ -162,16 +174,23 @@ wss.on('connection', function connection(ws, req) {
                 cancels[instance] = () => {
                   toWorker({type: 'WORKER_KILL'});
                 };
-                return;
+                break;
+              }
+              case 'SWINGSET_LOG': {
+                send({type: 'SS_LOG', instance, data: action.data});
+                break;
+              }
+              default: {
+                send({type: 'SS_ERROR', instance, error: `Unrecognized worker message type ${JSON.stringify(action.type)}`});
+              }
             }
-            send({type: 'SS_ERROR', instance, error: `Unrecognized worker message type ${JSON.stringify(action.type)}`});
           } catch (e) {
             log(`Internal ${instance} error`, e);
             send({type: 'SS_ERROR', instance, error: `Internal error processing worker message`});
           }
         }
 
-        runWorker(instance, demoPath(action.name), fromWorker)
+        runWorker(instance, demoPath(demoName), fromWorker)
           .then((code) => {
             delete cancels[instance];
             log('got worker exit of', code);
@@ -185,6 +204,7 @@ wss.on('connection', function connection(ws, req) {
       }
       case 'SS_EXIT': {
         toWorker({type: 'WORKER_EXIT'})
+        break;
       }
       case 'SS_CANCEL': {
         const cancel = cancels[instance];
@@ -193,9 +213,12 @@ wss.on('connection', function connection(ws, req) {
           return;
         }
         cancel();
+        break;
+      }
+      default: {
+        send({type: 'SS_ERROR', error: `Unrecognized client message ${action.type}`});
       }
       }
-      send({type: 'SS_ERROR', error: `Unrecognized client message ${action.type}`});
     } catch (e) {
       log(`Error processing message ${JSON.stringify(message)}`, e);
       send({type: 'SS_ERROR', error: `Internal server error`});

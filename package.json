@@ -11,7 +11,7 @@
   },
   "scripts": {
     "ui": "cd ui&&npm run start",
-    "server": "cd bin&&nodemon ssfactory",
+    "server": "nodemon -w bin -w node_modules bin/ssfactory",
     "start": "bin/ssfactory",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
