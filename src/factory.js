@@ -53,8 +53,13 @@ async function runWorker(instance, home, send) {
 const fs = require('fs');
 const express = require('express');
 const WebSocket = require('ws');
+const morgan = require('morgan');
 
 const app = express();
+
+// Web logging.
+app.use(morgan(`HTTP: :method :url :status :res[content-length] - :response-time ms`));
+
 const server = app.listen(PORT, function listening() {
   log('Listening on', PORT);
 });

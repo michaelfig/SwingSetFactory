@@ -19,5 +19,8 @@ COPY package*.json ./
 RUN npm install --production
 RUN ln -sf $PWD/node_modules/@agoric/swingset-vat/src ./src/
 
+RUN useradd -m ssfactory
+USER ssfactory
+
 EXPOSE 8000
-ENTRYPOINT ["bash", "-c", "./bin/ssfactory"]
+ENTRYPOINT ["./bin/ssfactory"]
