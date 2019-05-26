@@ -1,9 +1,10 @@
 import React from 'react';
 
 import {Launcher} from './Launcher'; 
+import {ILogMessage, LogViewer, makeLogMessage} from './Log';
 interface IAppState {
   ws?: WebSocket,
-  console: string,
+  logs: ILogMessage[],
 }
 
 interface IAppProps {}
@@ -11,16 +12,20 @@ interface IAppProps {}
 // TODO(mfig): Only have react-router in this file.
 class App extends React.Component<IAppProps, IAppState> {
   public state: IAppState = {
-    console: '',
+    logs: [],
   };
 
   private socketEndpoint = '';
 
   private appendConsole = (msg: string) => {
-    this.setState({console: this.state.console + msg});
+    // Try parsing the message.  If it fails, it's a continuation.
+    const logs = this.state.logs;
+    const log = makeLogMessage(msg, logs[logs.length - 1]);
+    this.setState({logs: [...logs, log]});
   }
 
   private sendQ: unknown[] = [];
+  private lastWsInstance = 0;
 
   private queuingSend = (obj: unknown) => {
     this.sendQ.push(obj);
@@ -41,8 +46,9 @@ class App extends React.Component<IAppProps, IAppState> {
   }
 
   public componentDidMount() {
+    const wsinstance = ++this.lastWsInstance;
     const log = (...args: any[]) => {
-      this.appendConsole([`WebSocket[${this.socketEndpoint}]:`, ...args].join(' ') + '\n');
+      this.appendConsole([`WebSocket.${wsinstance}[${this.socketEndpoint}]:`, ...args].join(' ') + '\n');
     };
     const ws = new WebSocket(this.socketEndpoint);
     ws.addEventListener('error', (ev) => {
@@ -99,7 +105,7 @@ class App extends React.Component<IAppProps, IAppState> {
     return (
       <div className="App">
         <Launcher send={send}/>
-        <pre>{this.state.console}</pre>
+        <LogViewer logs={this.state.logs}/>
       </div>
     );
   }
