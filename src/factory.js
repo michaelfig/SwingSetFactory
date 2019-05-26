@@ -57,7 +57,7 @@ const morgan = require('morgan');
 
 const app = express();
 
-// Web logging.
+// HTTP logging.
 app.use(morgan(`HTTP: :method :url :status :res[content-length] - :response-time ms`));
 
 const server = app.listen(PORT, function listening() {
@@ -65,8 +65,15 @@ const server = app.listen(PORT, function listening() {
 });
 const wss = new WebSocket.Server({server});
 
-app.use(express.static(`${__dirname}/../ui/build`));
+// Serve built UI files.
+function serveUI(app) { 
+    const staticDir = `${__dirname}/../ui/build`;
+    log(`Serving static files from ${staticDir}`);
+    app.use(express.static(`${staticDir}`));
+}
+serveUI(app);
 
+// FIXME: Maybe implement a REST api?
 const api = express.Router();
 api.get('foo', (req, res) => {
   log('got foo');
