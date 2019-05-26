@@ -10,6 +10,12 @@ If you want to run the Docker image, you only need the `ssfactory` shell script:
 ./ssfactory --help
 ```
 
+To install the script globally, run:
+
+```
+make docker-install
+```
+
 ## Build from source
 
 Run:

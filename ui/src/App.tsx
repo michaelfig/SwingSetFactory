@@ -36,7 +36,7 @@ class App extends React.Component<IAppProps, IAppState> {
       this.socketEndpoint = `ws://${loc.hostname}:8000/api/swingset`;
     } else {
       const protocol = loc.protocol.replace(/^http/, 'ws');
-      this.socketEndpoint = `${protocol}://${loc.host}/api/swingset`;
+      this.socketEndpoint = `${protocol}//${loc.host}/api/swingset`;
     }
   }
 

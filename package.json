@@ -11,7 +11,8 @@
   },
   "scripts": {
     "ui": "cd ui&&npm run start",
-    "server": "nodemon -w bin -w node_modules bin/ssfactory",
+    "server": "nodemon -w src -w node_modules bin/ssfactory",
+    "postinstall": "ln -sf $PWD/node_modules/@agoric/swingset-vat/src ./src/",
     "start": "bin/ssfactory",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

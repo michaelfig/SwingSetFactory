@@ -78,7 +78,7 @@ function demoPath(name) {
   if (!/^[a-z][-a-z0-9_]*$/i.test(s)) {
     throw RangeError(`Invalid demo name ${s}`);
   }
-  return `${__dirname}/../demo/${s}`;
+  return `${__dirname}/demo/${s}`;
 }
 
 let lastClientID = 0;
