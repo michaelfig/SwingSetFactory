@@ -1,7 +1,8 @@
 #! /usr/bin/env node
 const self = process.argv[1];
 if (process.env.SWINGSET_WORKER) {
-  const log = (...args) => console.error(`SwingSet[${process.pid}]:`, ...args);
+  const instance = process.env.SWINGSET_INSTANCE;
+  const log = (...args) => console.error(`SwingSet.${process.pid}[${instance}]:`, ...args);
   console.log = log;
   const home = process.env.SWINGSET_WORKER;
   const send = (obj) => process.stdout.write(frame(JSON.stringify(obj)));
@@ -55,7 +56,7 @@ async function runWorker(instance, home, send) {
   return new Promise((resolve, reject) => {
     let buf = '';
     const worker = child_process.fork(self, [], {
-      env: {...process.env, SWINGSET_WORKER: home},
+      env: {...process.env, SWINGSET_WORKER: home, SWINGSET_INSTANCE: instance},
       silent: true,
       });
     send({type: 'SWINGSET_STARTED', send: (obj) => {
@@ -87,7 +88,7 @@ async function runWorker(instance, home, send) {
     });
     worker.on('close', (code) => {
       log('child exited with code', code);
-      resolve(code);
+      resolve([worker.pid, code]);
     });
   });
 }
@@ -191,10 +192,10 @@ wss.on('connection', function connection(ws, req) {
         }
 
         runWorker(instance, demoPath(demoName), fromWorker)
-          .then((code) => {
+          .then(([pid, code]) => {
             delete cancels[instance];
             log('got worker exit of', code);
-            send({type: 'SS_EXIT', instance, code});
+            send({type: 'SS_EXIT', instance, pid, code, prefix: `SwingSet.${pid}[${instance}]`});
           })
           .catch(e => {
             log('got exception', e);
