@@ -27,8 +27,8 @@ export class Launcher extends React.Component<ILauncherProps> {
         return (
             <div>
                 What kind of SwingSet would you like? <select>
-                    <option>Generic Ephemeral</option>
-                    <option disabled={true}>Cosmos Follower</option></select>
+                    <option>Generic Solo</option>
+                    <option disabled={true}>Solo Cosmos Follower</option></select>
                 <br/>
                 Initial Vats: <select defaultValue={DEFAULT_BOOTSTRAP} onChange={this.onBootstrapChange}>
                     <option>encouragementBot</option>
