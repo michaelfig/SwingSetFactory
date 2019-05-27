@@ -1,3 +1,6 @@
 build:
   docker:
     web: Dockerfile
+run:
+  # Heroku forces us to use a command, even though ENTRYPOINT is specified.
+  web: heroku

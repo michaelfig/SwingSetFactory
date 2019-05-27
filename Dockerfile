@@ -24,3 +24,4 @@ USER ssfactory
 
 EXPOSE 8000
 ENTRYPOINT ["./bin/ssfactory"]
+
