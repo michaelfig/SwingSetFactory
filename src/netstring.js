@@ -31,4 +31,23 @@ function unframe(framed, maxLength) {
     return [str.substr(0, length), str.substr(length)];
 }
 
-module.exports = {frame, unframe};
+function makeJSONHandler(handler, logger) {
+    let buf = '';
+    return (data) => {
+        const str = String(data);
+        if (logger) {
+            logger(str);
+        }
+        buf += str;
+        let strBuf;
+        while ((strBuf = unframe(buf)) && strBuf[0] !== undefined) {
+          buf = strBuf[1];
+          handler(JSON.parse(strBuf[0]));
+        }
+        if (strBuf) {
+          buf = strBuf[1];
+        }
+    };
+}
+
+module.exports = {frame, unframe, makeJSONHandler};

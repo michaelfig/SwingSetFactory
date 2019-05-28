@@ -1,4 +1,4 @@
-const {frame, unframe} = require('./netstring');
+const {frame, makeJSONHandler} = require('./netstring');
 
 const log = (...args) => console.log(`Factory[${process.pid}]:`, ...args);
 log('Starting SwingSetFactory');
@@ -36,19 +36,8 @@ async function runWorker(instance, home, send) {
     }});
 
     // Receive from the worker.
-    worker.stdio[workerFd].addListener('data', (data) => {
-      const str = String(data);
-      log('from child:', JSON.stringify(str));
-      buf += str;
-      let strBuf;
-      while ((strBuf = unframe(buf)) && strBuf[0] !== undefined) {
-        buf = strBuf[1];
-        send(JSON.parse(strBuf[0]));
-      }
-      if (strBuf) {
-        buf = strBuf[1];
-      }
-    });
+    worker.stdio[workerFd].addListener('data',
+      makeJSONHandler(send, (str) => log('from child:', JSON.stringify(str))));
 
     worker.stderr.on('data', (data) => {
       // Note, we have no framing, since anything could write to stderr.
