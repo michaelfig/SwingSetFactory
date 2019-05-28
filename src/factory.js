@@ -8,12 +8,22 @@ const child_process = require('child_process');
 let lastWorkerID = 0;
 async function runWorker(instance, home, send) {
   const workerID = ++lastWorkerID;
+  // This is just a constant for the worker.
+  const stdio = ['pipe', 'pipe', 'pipe', 'ipc'];
+  const workerFd = stdio.length;
+  stdio[workerFd] = 'pipe';
   const log = (...args) => console.log(`Worker.${workerID}[${instance}]:`, ...args)
   return new Promise((resolve, reject) => {
     let buf = '';
     const worker = child_process.fork(`${__dirname}/worker.js`, [], {
-      env: {...process.env, SWINGSET_WORKER: home, SWINGSET_INSTANCE: instance},
+      env: {
+        ...process.env,
+        SWINGSET_WORKER: home,
+        SWINGSET_FD: workerFd,
+        SWINGSET_INSTANCE: instance,
+      },
       silent: true,
+      stdio,
       });
     send({type: 'SWINGSET_STARTED', send: (obj) => {
       if (obj.type === 'WORKER_KILL') {
@@ -23,8 +33,10 @@ async function runWorker(instance, home, send) {
         // Send to the worker.
         worker.stdin.write(frame(JSON.stringify(obj)));
       }
-    }})
-    worker.stdout.on('data', (data) => {
+    }});
+
+    // Receive from the worker.
+    worker.stdio[workerFd].addListener('data', (data) => {
       const str = String(data);
       log('from child:', JSON.stringify(str));
       buf += str;
@@ -37,10 +49,15 @@ async function runWorker(instance, home, send) {
         buf = strBuf[1];
       }
     });
+
     worker.stderr.on('data', (data) => {
       // Note, we have no framing, since anything could write to stderr.
       log('child error:', data.toString().trimRight());
-      send({type: 'SWINGSET_LOG', data: data.toString()});
+      send({type: 'SWINGSET_LOG', priority: 'error', data: data.toString()});
+    });
+    worker.stdout.on('data', (data) => {
+      log('child output:', data.toString().trimRight());
+      send({type: 'SWINGSET_LOG', priority: 'info', data: data.toString()});
     });
     worker.on('close', (code) => {
       log('child exited with code', code);

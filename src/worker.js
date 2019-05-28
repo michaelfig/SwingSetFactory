@@ -1,9 +1,15 @@
 const {frame, unframe} = require('./netstring');
+const Nat = require('@agoric/nat');
+const fs = require('fs');
 
 const instance = process.env.SWINGSET_INSTANCE;
-const log = (...args) => console.error(`SwingSet.${process.pid}[${instance}]:`, ...args);
-console.log = log;
-const send = (obj) => process.stdout.write(frame(JSON.stringify(obj)));
+const sendFd = Nat(Number(process.env.SWINGSET_FD));
+const sendStream = fs.createWriteStream(null, {fd: sendFd});
+sendStream.addListener('error', (err) => {
+    console.error(`Cannot write to SWINGSET_FD=${sendFd}:`, err);
+    process.exit(1);
+});
+const send = (obj) => sendStream.write(frame(JSON.stringify(obj)));
 send({type: 'SWINGSET_STARTED'});
 
 // Parameters.
@@ -12,7 +18,6 @@ const withSES = true;
 const vatArgv = []; // FIXME
 
 // The rest of this is taken almost directly from SwingSet/bin/vat
-const fs = require('fs');
 const path = require('path');
 require = require('esm')(module);
 const util = require('util');
