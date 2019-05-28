@@ -1,5 +1,6 @@
 
-* Support Cosmos Validator (N instances) as a Vat Machine type.
+* Support Cosmos Validator (N instances) as a Vat Machine type
+* Provide persistent vs. ephemeral SwingSets.  Try before you buy, buy it.
 * Add quotas to the number of Vat Machines you can launch
 * Kill off your workers when your browser drops the (WebSocket) connection.
 * Pretty up the UI (currently a sucky React app)

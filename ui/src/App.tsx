@@ -1,7 +1,9 @@
 import React from 'react';
 
+import {FlexColWide, FlexRow, FlexRowTall} from './Flex';
 import {Launcher} from './Launcher'; 
 import {ILogMessage, LogViewer, makeLogMessage} from './Log';
+import {Prompt} from './Prompt';
 interface IAppState {
   ws?: WebSocket,
   logs: ILogMessage[],
@@ -100,13 +102,29 @@ class App extends React.Component<IAppProps, IAppState> {
     this.setState({ws});
   }
 
+  private onSubmit = (command: string, mode: string) => {
+    switch (mode) {
+      case 'json':
+        window.alert('Would JSON ' + command);
+        break;
+      case 'eval':
+        window.alert('Would eval ' + command);
+        break;
+      default:
+        window.alert('unknown command mode ' + mode);
+    }
+  };
+
   public render() {
     const send = (obj: unknown) => this.send(obj);
     return (
-      <div className="App">
-        <Launcher send={send}/>
-        <LogViewer logs={this.state.logs}/>
-      </div>
+      <FlexColWide className="App" style={{height: '100%', padding: '10px'}}>
+        <FlexRow><Launcher send={send}/></FlexRow>
+        <FlexRowTall>
+          <LogViewer logs={this.state.logs}/>
+        </FlexRowTall>
+        <FlexRow><Prompt onSubmit={this.onSubmit}/></FlexRow>
+      </FlexColWide>
     );
   }
 }

@@ -1,4 +1,4 @@
-const {frame, unframe} = require('./netstring');
+const {frame, makeJSONHandler} = require('./netstring');
 const Nat = require('@agoric/nat');
 const fs = require('fs');
 
@@ -9,7 +9,12 @@ sendStream.addListener('error', (err) => {
     console.error(`Cannot write to SWINGSET_FD=${sendFd}:`, err);
     process.exit(1);
 });
+
 const send = (obj) => sendStream.write(frame(JSON.stringify(obj)));
+let controller;
+process.stdin.addListener('data', makeJSONHandler(
+    (action) => console.log(`Would handle: ${JSON.stringify(action)}`),
+    (str) => console.log('Received from SwingSetFactory:', JSON.stringify(str))));
 send({type: 'SWINGSET_STARTED'});
 
 // Parameters.
@@ -29,11 +34,14 @@ async function main() {
     const ldSrcPath = require.resolve('@agoric/swingset-vat/src/devices/loopbox-src');
     config.devices = [['loopbox', ldSrcPath, {}]];
 
-    const controller = await buildVatController(config, withSES, vatArgv);
+    controller = await buildVatController(config, withSES, vatArgv);
+
     await controller.run();
     console.log('= vat finished');
 }
 
+// Put in a little sleep after main.
 main()
+    .then(() => new Promise((resolve) => setTimeout(resolve, 3000)))
     .then(() => process.exit(0))
     .catch((e) => log('Error running vat:', e));

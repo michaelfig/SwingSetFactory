@@ -1,3 +1,4 @@
+import {FlexColWide, FlexRow, FlexRowTall} from './Flex';
 import React from 'react';
 
 export interface ILogMessage {
@@ -58,7 +59,7 @@ export class LogMessageList extends React.Component<ILogMessageListProps> {
             const log = this.props.logs[i];
             logs.push(<LogMessage key={i} log={log}/>)
          }
-        return <div>{logs}</div>
+        return <FlexRowTall style={{height: '100%'}}>{logs}</FlexRowTall>
     }
 }
 
@@ -82,9 +83,10 @@ export class LogViewer extends React.Component<ILogViewerProps> {
             }
         });
         return (
-            <div><div>Would provide filter here</div>
+            <FlexColWide>
+                <FlexRow>Would provide filter here</FlexRow>
                 <LogMessageList logs={logs}/>
-            </div>
+            </FlexColWide>
         )
     }
 }
