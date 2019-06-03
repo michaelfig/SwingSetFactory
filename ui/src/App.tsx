@@ -40,7 +40,7 @@ class App extends React.Component<IAppProps, IAppState> {
     const loc = window.location;
     if (loc.hostname === 'localhost' && loc.port === '3000') {
       // Debug server.
-      this.socketEndpoint = `ws://${loc.hostname}:8000/api/swingset`;
+      this.socketEndpoint = `ws://${loc.hostname}:3001/api/swingset`;
     } else {
       const protocol = loc.protocol.replace(/^http/, 'ws');
       this.socketEndpoint = `${protocol}//${loc.host}/api/swingset`;

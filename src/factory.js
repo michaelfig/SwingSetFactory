@@ -2,7 +2,7 @@ const {frame, makeJSONHandler} = require('./netstring');
 
 const log = (...args) => console.log(`Factory[${process.pid}]:`, ...args);
 log('Starting SwingSetFactory');
-const PORT = Number(process.env.PORT) || 8000;
+const PORT = Number(process.env.PORT) || 3001;
 const child_process = require('child_process');
 
 let lastWorkerID = 0;
